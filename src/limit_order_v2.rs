@@ -117,7 +117,7 @@ impl Debug for OdosLimitOrderRouter::TokenInfo {
 
 // codegen the odos_limit_order_v2 contract
 sol!(
-    #[allow(missing_docs)]
+    #[allow(missing_docs, clippy::too_many_arguments)]
     #[sol(rpc)]
     OdosLimitOrderV2,
     "abis/odos_limit_order_v2.json"

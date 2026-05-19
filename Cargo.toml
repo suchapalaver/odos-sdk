@@ -41,7 +41,7 @@ contracts = ["v2", "v3", "limit-orders", "multicall"]
 alloy-chains = "0.2"
 alloy-contract = { version = "2.0", default-features = false, optional = true }
 alloy-network = { version = "2.0", default-features = false }
-alloy-primitives = { version = "1.5", default-features = false, features = [
+alloy-primitives = { version = "1.6", default-features = false, features = [
     "std",
     "rlp",
 ] }
@@ -49,7 +49,7 @@ alloy-provider = { version = "2.0", default-features = false, features = [
     "reqwest",
 ], optional = true }
 alloy-rpc-types = "2.0"
-alloy-sol-types = { version = "1.5", features = ["json"] }
+alloy-sol-types = { version = "1.6", features = ["json"] }
 alloy-transport = { version = "2.0", default-features = false, optional = true }
 
 backon = "1.6"
