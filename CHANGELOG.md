@@ -7,9 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [11.0.1] - 2026-05-19
+
 ### Changed
 
 - Bump `alloy-primitives` and `alloy-sol-types` to `1.6`.
+
+### Fixed
+
+- Update README installation snippets to reference the `11` major series.
 
 ## [11.0.0] - 2026-05-04
 
