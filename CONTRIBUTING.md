@@ -13,7 +13,7 @@ Thank you for your interest in contributing to odos-sdk! This document provides 
 ### Clone the Repository
 
 ```bash
-git clone https://github.com/semiotic-ai/odos-sdk.git
+git clone https://github.com/suchapalaver/odos-sdk.git
 cd odos-sdk
 ```
 

@@ -899,4 +899,4 @@ async fn main() -> Result<()> {
 - [Getting Started Guide](GETTING_STARTED.md)
 - [API Documentation](https://docs.rs/odos-sdk)
 - [Odos Protocol Docs](https://docs.odos.xyz)
-- [GitHub Repository](https://github.com/semiotic-ai/odos-sdk)
+- [GitHub Repository](https://github.com/suchapalaver/odos-sdk)

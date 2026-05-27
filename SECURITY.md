@@ -14,7 +14,7 @@ We actively maintain odos-sdk with a focus on the latest releases:
 - Stable releases: Current and previous major versions supported
 - Security fixes prioritized based on severity and affected versions
 
-To check the current version and release notes, see [Releases](https://github.com/semiotic-ai/odos-sdk/releases) or [crates.io](https://crates.io/crates/odos-sdk).
+To check the current version and release notes, see [Releases](https://github.com/suchapalaver/odos-sdk/releases) or [crates.io](https://crates.io/crates/odos-sdk).
 
 ## Reporting a Vulnerability
 
@@ -26,7 +26,7 @@ We take security vulnerabilities seriously. If you discover a security issue, pl
 
 Instead, please report security vulnerabilities through:
 
-- **GitHub Security Advisories**: [Report a vulnerability](https://github.com/semiotic-ai/odos-sdk/security/advisories/new)
+- **GitHub Security Advisories**: [Report a vulnerability](https://github.com/suchapalaver/odos-sdk/security/advisories/new)
 
 This is the preferred and most secure method for reporting vulnerabilities.
 
@@ -284,7 +284,7 @@ If you suspect your application using odos-sdk has been compromised:
 1. **Isolate**: Immediately isolate affected systems
 2. **Rotate Keys**: Rotate any API keys that may have been exposed
 3. **Investigate**: Determine scope of compromise
-4. **Notify**: [Report via GitHub Security Advisories](https://github.com/semiotic-ai/odos-sdk/security/advisories/new) if the SDK itself is implicated
+4. **Notify**: [Report via GitHub Security Advisories](https://github.com/suchapalaver/odos-sdk/security/advisories/new) if the SDK itself is implicated
 5. **Update**: Update to latest patched version if vulnerability was in SDK
 
 ## Security Checklist for Production
@@ -314,6 +314,6 @@ Before deploying applications using odos-sdk to production:
 
 For security-related questions or concerns:
 
-- **Security Reports**: [GitHub Security Advisories](https://github.com/semiotic-ai/odos-sdk/security/advisories/new)
-- **General Questions**: [GitHub Discussions](https://github.com/semiotic-ai/odos-sdk/discussions)
-- **Project Issues**: <https://github.com/semiotic-ai/odos-sdk/issues>
+- **Security Reports**: [GitHub Security Advisories](https://github.com/suchapalaver/odos-sdk/security/advisories/new)
+- **General Questions**: [GitHub Discussions](https://github.com/suchapalaver/odos-sdk/discussions)
+- **Project Issues**: <https://github.com/suchapalaver/odos-sdk/issues>

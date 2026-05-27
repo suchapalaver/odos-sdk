@@ -534,7 +534,7 @@ cargo doc --all-features --no-deps
 
 - **Examples**: See [EXAMPLES.md](EXAMPLES.md) for comprehensive patterns
 - **Getting Started**: Check [GETTING_STARTED.md](GETTING_STARTED.md) for tutorials
-- **Issues**: Report problems at [GitHub Issues](https://github.com/semiotic-ai/odos-sdk/issues)
+- **Issues**: Report problems at [GitHub Issues](https://github.com/suchapalaver/odos-sdk/issues)
 - **Odos Docs**: [docs.odos.xyz](https://docs.odos.xyz)
 
 ## Summary

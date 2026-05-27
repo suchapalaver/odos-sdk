@@ -520,7 +520,7 @@ odos-sdk = { version = "4", features = ["contracts"] }
 
 ## Support
 
-- **GitHub Issues**: [github.com/semiotic-ai/odos-sdk/issues](https://github.com/semiotic-ai/odos-sdk/issues)
+- **GitHub Issues**: [github.com/suchapalaver/odos-sdk/issues](https://github.com/suchapalaver/odos-sdk/issues)
 - **Odos Documentation**: [docs.odos.xyz](https://docs.odos.xyz)
 - **Discord**: Join the Odos community for support
 

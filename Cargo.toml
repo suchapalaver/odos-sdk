@@ -2,7 +2,7 @@
 name = "odos-sdk"
 version = "11.0.1"
 
-authors = ["Joseph Livesey <joseph@semiotic.ai>"]
+authors = ["Joseph Livesey <jlivesey@gmail.com>"]
 categories = ["finance", "api-bindings"]
 description = "Rust SDK for Odos"
 edition = "2021"
@@ -10,7 +10,7 @@ homepage = "https://crates.io/crates/odos-sdk"
 keywords = ["defi", "ethereum", "web3", "blockchain", "sdk"]
 license = "Apache-2.0"
 readme = "README.md"
-repository = "https://github.com/semiotic-ai/odos-sdk"
+repository = "https://github.com/suchapalaver/odos-sdk"
 
 [features]
 # Default features: most common use case with V2/V3 router support and on-chain preflight helpers
