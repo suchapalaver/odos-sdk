@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [11.0.2] - 2026-05-27
+
+### Changed
+
+- Move crate source to a personal fork: update `repository` URL, maintainer
+  contact email, and documentation links from `semiotic-ai/odos-sdk` to
+  `suchapalaver/odos-sdk`. No API or runtime behavior changes.
+
 ## [11.0.1] - 2026-05-19
 
 ### Changed
