@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: ${{ github.event_name == 'pull_request' && github.event.pull_request.commits || 10 }}
 
@@ -40,12 +40,12 @@ jobs:
         run: git fetch origin ${{ github.event.before }}
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
       - name: Cache pip
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/pip
           key: pip-commitizen-${{ runner.os }}
@@ -80,7 +80,7 @@ jobs:
     name: reuse lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: REUSE Compliance Check
         uses: fsfe/reuse-action@v5
 
@@ -88,7 +88,7 @@ jobs:
     name: cargo fmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
         with:
@@ -101,7 +101,7 @@ jobs:
     name: cargo clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
         with:
@@ -118,7 +118,7 @@ jobs:
     name: cargo audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
         with:
@@ -144,7 +144,7 @@ jobs:
           - "limit-orders"
           - "contracts"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
         with:
