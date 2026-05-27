@@ -1,45 +1,74 @@
 [package]
 name = "odos-sdk"
-version = "0.1.4"
+version = "11.0.1"
 
 authors = ["Joseph Livesey <joseph@semiotic.ai>"]
 categories = ["finance", "api-bindings"]
 description = "Rust SDK for Odos"
-edition = "2024"
+edition = "2021"
 homepage = "https://crates.io/crates/odos-sdk"
 keywords = ["defi", "ethereum", "web3", "blockchain", "sdk"]
 license = "Apache-2.0"
 readme = "README.md"
-repository = "https://github.com/semiotic-ai/odos-rs"
+repository = "https://github.com/semiotic-ai/odos-sdk"
+
+[features]
+# Default features: most common use case with V2/V3 router support and on-chain preflight helpers
+default = ["v2", "v3", "multicall"]
+
+# Minimal: Core API types and HTTP client only (no contract bindings)
+minimal = []
+
+# Contract binding features
+# Note: V2 is the base contract feature (provides SwapInputs type used by all routers)
+v2 = [
+    "dep:alloy-contract",
+    "dep:alloy-provider",
+    "dep:alloy-transport",
+] # V2 router contract bindings
+v3 = ["v2"] # V3 router contract bindings (requires v2 for SwapInputs)
+limit-orders = [
+    "v2",
+] # Limit order contract bindings (requires v2 for SwapInputs)
+
+# On-chain utilities for balances/allowances and swap preflight checks
+multicall = ["dep:alloy-contract", "dep:alloy-provider", "dep:alloy-transport"]
+
+# Convenience feature to enable all contract bindings
+contracts = ["v2", "v3", "limit-orders", "multicall"]
 
 [dependencies]
-alloy-chains = "0.2.0"
-alloy-contract = { version = "0.14.0", default-features = false }
-alloy-json-rpc = { version = "0.14.0", default-features = false }
-alloy-network = { version = "0.14.0", default-features = false }
-alloy-primitives = { version = "1.0.0", default-features = false, features = [
+alloy-chains = "0.2"
+alloy-contract = { version = "2.0", default-features = false, optional = true }
+alloy-network = { version = "2.0", default-features = false }
+alloy-primitives = { version = "1.6", default-features = false, features = [
     "std",
     "rlp",
 ] }
-alloy-provider = { version = "0.14.0", default-features = false, features = [
+alloy-provider = { version = "2.0", default-features = false, features = [
+    "reqwest",
+], optional = true }
+alloy-rpc-types = "2.0"
+alloy-sol-types = { version = "1.6", features = ["json"] }
+alloy-transport = { version = "2.0", default-features = false, optional = true }
+
+backon = "1.6"
+bon = "3.9"
+reqwest = { version = "0.13", features = ["json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+tokio = { version = "1.52", features = ["time", "rt"] }
+tracing = "0.1"
+url = "2.5"
+uuid = { version = "1.23", features = ["serde", "v4"] }
+
+[dev-dependencies]
+alloy-provider = { version = "2.0", default-features = false, features = [
     "anvil-node",
     "reqwest",
 ] }
-alloy-rpc-client = "0.14.0"
-alloy-rpc-types = "0.14.0"
-alloy-signer = { version = "0.14.0", default-features = false }
-alloy-signer-local = { version = "0.14.0", default-features = false }
-alloy-sol-types = { version = "1.0.0", features = ["json"] }
-alloy-sol-type-parser = "1.0.0"
-alloy-transport = { version = "0.14.0", default-features = false }
-alloy-transport-http = { version = "0.14.0", default-features = false, features = [
-    "reqwest",
-] }
-anyhow = "1.0.97"
-bon = "3.4.0"
-
-reqwest = { version = "0.12.12", features = ["json"] }
-serde = { version = "1.0.219", features = ["derive"] }
-serde_json = "1.0.140"
-thiserror = "2.0.12"
-tracing = "0.1.41"
+wiremock = "0.6"
+tokio-test = "0.4"
+tokio = { version = "1.52", features = ["macros", "rt-multi-thread"] }
+http = "1.4"

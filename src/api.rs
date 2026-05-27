@@ -1,20 +1,353 @@
+// SPDX-FileCopyrightText: 2025 Semiotic AI, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
+
 use std::fmt::Display;
 
-use alloy_primitives::{Address, Bytes, U256};
+use alloy_primitives::{Address, U256};
 use bon::Builder;
 use serde::{Deserialize, Serialize};
-use tracing::debug;
+use url::Url;
 
-use crate::{
-    OdosRouterV2::{inputTokenInfo, outputTokenInfo, swapTokenInfo},
-    OdosV2Router::{OdosV2RouterCalls, swapCall},
+use crate::{error_code::TraceId, OdosError, Result};
+
+#[cfg(feature = "v2")]
+use {
+    crate::OdosRouterV2::{inputTokenInfo, outputTokenInfo, swapTokenInfo},
+    crate::OdosV2Router::{swapCall, OdosV2RouterCalls},
+    alloy_primitives::Bytes,
+    tracing::debug,
 };
 
+#[cfg(feature = "v3")]
+use {
+    crate::IOdosRouterV3::swapTokenInfo as v3SwapTokenInfo, crate::OdosV3Router::OdosV3RouterCalls,
+};
+
+/// API host tier for the Odos API
+///
+/// Odos provides two API host tiers:
+/// - **Public**: Standard API available to all users at <https://api.odos.xyz>
+/// - **Enterprise**: Premium API with enhanced features at <https://enterprise-api.odos.xyz>
+///
+/// Use in combination with [`ApiVersion`] via the [`Endpoint`] type for complete
+/// endpoint configuration.
+///
+/// # Examples
+///
+/// ```rust
+/// use odos_sdk::{ApiHost, ApiVersion, Endpoint};
+///
+/// // Use directly with Endpoint
+/// let endpoint = Endpoint::new(ApiHost::Public, ApiVersion::V2);
+///
+/// // Or use convenience methods
+/// let endpoint = Endpoint::public_v2();
+/// ```
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ApiHost {
+    /// Public API endpoint <https://docs.odos.xyz/build/api-docs>
+    ///
+    /// Standard API available to all users. Suitable for most use cases.
+    Public,
+    /// Enterprise API endpoint <https://docs.odos.xyz/build/enterprise-api>
+    ///
+    /// Premium API with enhanced features, higher rate limits, and dedicated support.
+    /// Requires an API key obtained through the Odos Enterprise program.
+    Enterprise,
+}
+
+impl ApiHost {
+    /// Get the base URL for the API host
+    ///
+    /// Returns the root URL for the selected host tier without any path segments.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use odos_sdk::ApiHost;
+    ///
+    /// let public = ApiHost::Public;
+    /// assert_eq!(public.base_url().as_str(), "https://api.odos.xyz/");
+    ///
+    /// let enterprise = ApiHost::Enterprise;
+    /// assert_eq!(enterprise.base_url().as_str(), "https://enterprise-api.odos.xyz/");
+    /// ```
+    pub fn base_url(&self) -> Url {
+        match self {
+            ApiHost::Public => Url::parse("https://api.odos.xyz/").unwrap(),
+            ApiHost::Enterprise => Url::parse("https://enterprise-api.odos.xyz/").unwrap(),
+        }
+    }
+}
+
+/// Version of the Odos API
+///
+/// Odos provides multiple API versions with different features and response formats:
+/// - **V2**: Stable production version with comprehensive swap routing
+/// - **V3**: Latest version with enhanced features and optimizations
+///
+/// Use in combination with [`ApiHost`] via the [`Endpoint`] type for complete
+/// endpoint configuration.
+///
+/// # Examples
+///
+/// ```rust
+/// use odos_sdk::{ApiHost, ApiVersion, Endpoint};
+///
+/// // Recommended: Use V2 for production
+/// let endpoint = Endpoint::new(ApiHost::Public, ApiVersion::V2);
+///
+/// // Or use V3 for latest features
+/// let endpoint = Endpoint::new(ApiHost::Public, ApiVersion::V3);
+/// ```
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ApiVersion {
+    /// API version 2 - Stable production version
+    ///
+    /// Recommended for most production use cases. Provides comprehensive
+    /// swap routing with extensive DEX coverage.
+    V2,
+    /// API version 3 - Latest version with enhanced features
+    ///
+    /// Includes optimizations and new features. Check the Odos documentation
+    /// for specific enhancements over V2.
+    V3,
+}
+
+impl ApiVersion {
+    /// Get the path segment for this version
+    ///
+    /// Returns the path component to use in API URLs (e.g., "v2", "v3").
+    fn path(&self) -> &'static str {
+        match self {
+            ApiVersion::V2 => "v2",
+            ApiVersion::V3 => "v3",
+        }
+    }
+}
+
+/// Complete API endpoint configuration combining host tier and API version
+///
+/// The `Endpoint` type provides an ergonomic way to configure both the API host
+/// tier (Public/Enterprise) and version (V2/V3) together.
+///
+/// # Examples
+///
+/// ## Using convenience constructors (recommended)
+///
+/// ```rust
+/// use odos_sdk::{ClientConfig, Endpoint};
+///
+/// // Public API V2 (default, recommended for production)
+/// let config = ClientConfig {
+///     endpoint: Endpoint::public_v2(),
+///     ..Default::default()
+/// };
+///
+/// // Enterprise API V3 (latest features)
+/// let config = ClientConfig {
+///     endpoint: Endpoint::enterprise_v3(),
+///     ..Default::default()
+/// };
+/// ```
+///
+/// ## Using explicit construction
+///
+/// ```rust
+/// use odos_sdk::{Endpoint, ApiHost, ApiVersion};
+///
+/// let endpoint = Endpoint::new(ApiHost::Enterprise, ApiVersion::V2);
+/// assert_eq!(endpoint.quote_url().as_str(), "https://enterprise-api.odos.xyz/sor/quote/v2");
+/// ```
+///
+/// ## Migration from old API
+///
+/// ```rust
+/// use odos_sdk::{ClientConfig, Endpoint};
+///
+/// // Old way (still works but deprecated)
+/// // let config = ClientConfig {
+/// //     endpoint: EndpointBase::Public,
+/// //     endpoint_version: EndpointVersion::V2,
+/// //     ..Default::default()
+/// // };
+///
+/// // New way
+/// let config = ClientConfig {
+///     endpoint: Endpoint::public_v2(),
+///     ..Default::default()
+/// };
+/// ```
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Deserialize, Serialize)]
+pub struct Endpoint {
+    host: ApiHost,
+    version: ApiVersion,
+}
+
+impl Endpoint {
+    /// Create a new endpoint with specific host and version
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use odos_sdk::{Endpoint, ApiHost, ApiVersion};
+    ///
+    /// let endpoint = Endpoint::new(ApiHost::Public, ApiVersion::V2);
+    /// ```
+    pub const fn new(host: ApiHost, version: ApiVersion) -> Self {
+        Self { host, version }
+    }
+
+    /// Public API V2 endpoint (default, recommended for production)
+    ///
+    /// This is the recommended configuration for most production use cases.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use odos_sdk::Endpoint;
+    ///
+    /// let endpoint = Endpoint::public_v2();
+    /// assert_eq!(endpoint.quote_url().as_str(), "https://api.odos.xyz/sor/quote/v2");
+    /// ```
+    pub const fn public_v2() -> Self {
+        Self::new(ApiHost::Public, ApiVersion::V2)
+    }
+
+    /// Public API V3 endpoint
+    ///
+    /// Use for latest features and optimizations on the public API.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use odos_sdk::Endpoint;
+    ///
+    /// let endpoint = Endpoint::public_v3();
+    /// assert_eq!(endpoint.quote_url().as_str(), "https://api.odos.xyz/sor/quote/v3");
+    /// ```
+    pub const fn public_v3() -> Self {
+        Self::new(ApiHost::Public, ApiVersion::V3)
+    }
+
+    /// Enterprise API V2 endpoint
+    ///
+    /// Use for enterprise tier with V2 API. Requires an API key.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use odos_sdk::Endpoint;
+    ///
+    /// let endpoint = Endpoint::enterprise_v2();
+    /// assert_eq!(endpoint.quote_url().as_str(), "https://enterprise-api.odos.xyz/sor/quote/v2");
+    /// ```
+    pub const fn enterprise_v2() -> Self {
+        Self::new(ApiHost::Enterprise, ApiVersion::V2)
+    }
+
+    /// Enterprise API V3 endpoint
+    ///
+    /// Use for enterprise tier with latest V3 features. Requires an API key.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use odos_sdk::Endpoint;
+    ///
+    /// let endpoint = Endpoint::enterprise_v3();
+    /// assert_eq!(endpoint.quote_url().as_str(), "https://enterprise-api.odos.xyz/sor/quote/v3");
+    /// ```
+    pub const fn enterprise_v3() -> Self {
+        Self::new(ApiHost::Enterprise, ApiVersion::V3)
+    }
+
+    /// Get the quote URL for this endpoint
+    ///
+    /// Constructs the full URL for the quote endpoint by combining the base URL
+    /// with the appropriate version path.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use odos_sdk::Endpoint;
+    ///
+    /// let endpoint = Endpoint::public_v2();
+    /// assert_eq!(endpoint.quote_url().as_str(), "https://api.odos.xyz/sor/quote/v2");
+    ///
+    /// let endpoint = Endpoint::enterprise_v3();
+    /// assert_eq!(endpoint.quote_url().as_str(), "https://enterprise-api.odos.xyz/sor/quote/v3");
+    /// ```
+    pub fn quote_url(&self) -> Url {
+        self.host
+            .base_url()
+            .join(&format!("sor/quote/{}", self.version.path()))
+            .unwrap()
+    }
+
+    /// Get the assemble URL for this endpoint
+    ///
+    /// The assemble endpoint is version-independent and constructs transaction data
+    /// from a previously obtained quote path ID.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use odos_sdk::Endpoint;
+    ///
+    /// let endpoint = Endpoint::public_v2();
+    /// assert_eq!(endpoint.assemble_url().as_str(), "https://api.odos.xyz/sor/assemble");
+    /// ```
+    pub fn assemble_url(&self) -> Url {
+        self.host.base_url().join("sor/assemble").unwrap()
+    }
+
+    /// Get the API host tier
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use odos_sdk::{Endpoint, ApiHost};
+    ///
+    /// let endpoint = Endpoint::public_v2();
+    /// assert_eq!(endpoint.host(), ApiHost::Public);
+    /// ```
+    pub const fn host(&self) -> ApiHost {
+        self.host
+    }
+
+    /// Get the API version
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use odos_sdk::{Endpoint, ApiVersion};
+    ///
+    /// let endpoint = Endpoint::public_v2();
+    /// assert_eq!(endpoint.version(), ApiVersion::V2);
+    /// ```
+    pub const fn version(&self) -> ApiVersion {
+        self.version
+    }
+}
+
+impl Default for Endpoint {
+    /// Returns the default endpoint: Public API V2
+    ///
+    /// This is the recommended configuration for most production use cases.
+    fn default() -> Self {
+        Self::public_v2()
+    }
+}
+
+/// Input token for the Odos quote API
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InputToken {
-    // Haven't looked much into it, but there's trouble if you try to make this a `Address`
-    token_address: String,
+    token_address: Address,
     // Odos API error message: "Input Amount should be positive integer in string form with < 64 digits[0x6]"
     amount: String,
 }
@@ -22,7 +355,7 @@ pub struct InputToken {
 impl InputToken {
     pub fn new(token_address: Address, amount: U256) -> Self {
         Self {
-            token_address: token_address.to_string(),
+            token_address,
             amount: amount.to_string(),
         }
     }
@@ -44,18 +377,18 @@ impl Display for InputToken {
     }
 }
 
+/// Output token for the Odos quote API
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OutputToken {
-    // Haven't looked much into it, but there's trouble if you try to make this a `Address`
-    token_address: String,
+    token_address: Address,
     proportion: u32,
 }
 
 impl OutputToken {
     pub fn new(token_address: Address, proportion: u32) -> Self {
         Self {
-            token_address: token_address.to_string(),
+            token_address,
             proportion,
         }
     }
@@ -78,6 +411,29 @@ impl Display for OutputToken {
 }
 
 /// Request to the Odos quote API: <https://docs.odos.xyz/build/api-docs>
+///
+/// # Using Type-Safe Newtypes
+///
+/// You can use the type-safe [`Slippage`](crate::Slippage), [`Chain`](crate::Chain),
+/// and [`ReferralCode`](crate::ReferralCode) types with their conversion methods:
+///
+/// ```rust
+/// use odos_sdk::{QuoteRequest, Slippage, Chain, ReferralCode};
+/// use alloy_primitives::Address;
+///
+/// let request = QuoteRequest::builder()
+///     .chain_id(Chain::ethereum().id())
+///     .slippage_limit_percent(Slippage::percent(0.5).unwrap().as_percent())
+///     .referral_code(ReferralCode::NONE.code())
+///     // ... other fields
+///     # .input_tokens(vec![])
+///     # .output_tokens(vec![])
+///     # .user_addr(Address::ZERO)
+///     # .compact(false)
+///     # .simple(false)
+///     # .disable_rfqs(false)
+///     .build();
+/// ```
 #[derive(Builder, Clone, Debug, Default, PartialEq, PartialOrd, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QuoteRequest {
@@ -85,8 +441,7 @@ pub struct QuoteRequest {
     input_tokens: Vec<InputToken>,
     output_tokens: Vec<OutputToken>,
     slippage_limit_percent: f64,
-    // Haven't looked much into it, but there's trouble if you try to make this a `Address`
-    user_addr: String,
+    user_addr: Address,
     compact: bool,
     simple: bool,
     referral_code: u32,
@@ -111,6 +466,8 @@ pub struct SingleQuoteResponse {
     out_amounts: Vec<String>,
     out_tokens: Vec<Address>,
     out_values: Vec<f64>,
+    /// Partner fee percentage. Defaults to 0.0 if not present (V3 API compatibility).
+    #[serde(default)]
     partner_fee_percent: f64,
     path_id: String,
     path_viz: Option<String>,
@@ -119,6 +476,11 @@ pub struct SingleQuoteResponse {
 }
 
 impl SingleQuoteResponse {
+    /// Get the first input amount of the quote.
+    pub fn in_amount(&self) -> Option<&String> {
+        self.in_amounts.first()
+    }
+
     /// Get the data gas estimate of the quote
     pub fn data_gas_estimate(&self) -> u64 {
         self.data_gas_estimate
@@ -134,18 +496,30 @@ impl SingleQuoteResponse {
         self.gas_estimate
     }
 
+    /// Get the estimated gas cost value of the quote.
+    pub fn gas_estimate_value(&self) -> f64 {
+        self.gas_estimate_value
+    }
+
+    /// Get the gas price used by the quote in gwei.
+    pub fn gwei_per_gas(&self) -> f64 {
+        self.gwei_per_gas
+    }
+
     /// Get the in amounts of the quote
     pub fn in_amounts_iter(&self) -> impl Iterator<Item = &String> {
         self.in_amounts.iter()
     }
 
     /// Get the in amount of the quote
-    pub fn in_amount_u256(&self) -> anyhow::Result<U256> {
+    pub fn in_amount_u256(&self) -> Result<U256> {
         let amount_str = self
             .in_amounts_iter()
             .next()
-            .ok_or(anyhow::anyhow!("Missing input amount"))?;
-        let amount: u128 = amount_str.parse()?;
+            .ok_or_else(|| OdosError::missing_data("Missing input amount"))?;
+        let amount: u128 = amount_str
+            .parse()
+            .map_err(|_| OdosError::invalid_input("Invalid input amount format"))?;
         Ok(U256::from(amount))
     }
 
@@ -194,11 +568,11 @@ impl SingleQuoteResponse {
     }
 
     /// Get the swap input token and amount
-    pub fn swap_input_token_and_amount(&self) -> anyhow::Result<(Address, U256)> {
+    pub fn swap_input_token_and_amount(&self) -> Result<(Address, U256)> {
         let input_token = *self
             .in_tokens_iter()
             .next()
-            .ok_or(anyhow::anyhow!("Missing input token"))?;
+            .ok_or_else(|| OdosError::missing_data("Missing input token"))?;
         let input_amount_in_u256 = self.in_amount_u256()?;
 
         Ok((input_token, input_amount_in_u256))
@@ -208,8 +582,52 @@ impl SingleQuoteResponse {
     pub fn price_impact(&self) -> f64 {
         self.price_impact
     }
+
+    /// Get the net output value of the quote.
+    pub fn net_out_value(&self) -> f64 {
+        self.net_out_value
+    }
+
+    /// Get the partner fee percent applied to the quote.
+    pub fn partner_fee_percent(&self) -> f64 {
+        self.partner_fee_percent
+    }
 }
 
+/// Error response from the Odos API
+///
+/// When the Odos API returns an error, it includes:
+/// - `detail`: Human-readable error message
+/// - `traceId`: UUID for tracking the error in Odos logs; may be `null` for some
+///   error codes (notably [`AlgoInternal`](crate::error_code::OdosErrorCode::AlgoInternal))
+///   or omitted entirely
+/// - `errorCode`: Numeric error code indicating the specific error type
+///
+/// Example error response:
+/// ```json
+/// {
+///   "detail": "Error getting quote, please try again",
+///   "traceId": "10becdc8-a021-4491-8201-a17b657204e0",
+///   "errorCode": 2999
+/// }
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OdosApiErrorResponse {
+    /// Human-readable error message
+    pub detail: String,
+    /// Trace ID for debugging (UUID); `None` when the API returns `"traceId": null`
+    /// or omits the field.
+    #[serde(default)]
+    pub trace_id: Option<TraceId>,
+    /// Numeric error code
+    pub error_code: u16,
+}
+
+/// Swap inputs for the Odos assemble API
+///
+/// Available only when the `v2` feature is enabled.
+#[cfg(feature = "v2")]
 #[derive(Clone, Debug)]
 pub struct SwapInputs {
     executor: Address,
@@ -219,13 +637,22 @@ pub struct SwapInputs {
     value_out_min: U256,
 }
 
+#[cfg(feature = "v2")]
 impl TryFrom<OdosV2RouterCalls> for SwapInputs {
-    type Error = anyhow::Error;
+    type Error = OdosError;
 
-    fn try_from(swap: OdosV2RouterCalls) -> Result<Self, Self::Error> {
+    fn try_from(swap: OdosV2RouterCalls) -> std::result::Result<Self, Self::Error> {
         match swap {
             OdosV2RouterCalls::swap(call) => {
-                debug!(call = ?call);
+                debug!(
+                    swap_type = "V2Router",
+                    input.token = %call.tokenInfo.inputToken,
+                    input.amount_wei = %call.tokenInfo.inputAmount,
+                    output.token = %call.tokenInfo.outputToken,
+                    output.min_wei = %call.tokenInfo.outputMin,
+                    executor = %call.executor,
+                    "Extracting swap inputs from V2 router call"
+                );
 
                 let swapCall {
                     executor,
@@ -264,11 +691,63 @@ impl TryFrom<OdosV2RouterCalls> for SwapInputs {
                     value_out_min: outputMin,
                 })
             }
-            _ => Err(anyhow::anyhow!("Unexpected OdosV2RouterCalls")),
+            _ => Err(OdosError::invalid_input("Unexpected OdosV2RouterCalls")),
         }
     }
 }
 
+#[cfg(feature = "v3")]
+impl TryFrom<OdosV3RouterCalls> for SwapInputs {
+    type Error = OdosError;
+
+    fn try_from(swap: OdosV3RouterCalls) -> std::result::Result<Self, Self::Error> {
+        match swap {
+            OdosV3RouterCalls::swap(call) => {
+                debug!(
+                    swap_type = "V3Router",
+                    input.token = %call.tokenInfo.inputToken,
+                    input.amount_wei = %call.tokenInfo.inputAmount,
+                    output.token = %call.tokenInfo.outputToken,
+                    output.min_wei = %call.tokenInfo.outputMin,
+                    executor = %call.executor,
+                    "Extracting swap inputs from V3 router call"
+                );
+
+                let v3SwapTokenInfo {
+                    inputToken,
+                    inputAmount,
+                    inputReceiver,
+                    outputMin,
+                    outputQuote,
+                    outputReceiver,
+                    outputToken,
+                } = call.tokenInfo;
+
+                let _output_quote = outputQuote;
+                let _referral_info = call.referralInfo;
+
+                Ok(Self {
+                    executor: call.executor,
+                    path_definition: call.pathDefinition,
+                    input_token_info: inputTokenInfo {
+                        tokenAddress: inputToken,
+                        amountIn: inputAmount,
+                        receiver: inputReceiver,
+                    },
+                    output_token_info: outputTokenInfo {
+                        tokenAddress: outputToken,
+                        relativeValue: U256::from(1),
+                        receiver: outputReceiver,
+                    },
+                    value_out_min: outputMin,
+                })
+            }
+            _ => Err(OdosError::invalid_input("Unexpected OdosV3RouterCalls")),
+        }
+    }
+}
+
+#[cfg(feature = "v2")]
 impl SwapInputs {
     /// Get the executor of the swap
     pub fn executor(&self) -> Address {
@@ -308,5 +787,147 @@ impl SwapInputs {
     /// Get the value out min of the swap
     pub fn value_out_min(&self) -> U256 {
         self.value_out_min
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_api_host_base_url() {
+        assert_eq!(ApiHost::Public.base_url().as_str(), "https://api.odos.xyz/");
+        assert_eq!(
+            ApiHost::Enterprise.base_url().as_str(),
+            "https://enterprise-api.odos.xyz/"
+        );
+    }
+
+    #[test]
+    fn test_api_version_path() {
+        assert_eq!(ApiVersion::V2.path(), "v2");
+        assert_eq!(ApiVersion::V3.path(), "v3");
+    }
+
+    #[test]
+    fn test_endpoint_constructors() {
+        let endpoint = Endpoint::public_v2();
+        assert_eq!(endpoint.host(), ApiHost::Public);
+        assert_eq!(endpoint.version(), ApiVersion::V2);
+
+        let endpoint = Endpoint::public_v3();
+        assert_eq!(endpoint.host(), ApiHost::Public);
+        assert_eq!(endpoint.version(), ApiVersion::V3);
+
+        let endpoint = Endpoint::enterprise_v2();
+        assert_eq!(endpoint.host(), ApiHost::Enterprise);
+        assert_eq!(endpoint.version(), ApiVersion::V2);
+
+        let endpoint = Endpoint::enterprise_v3();
+        assert_eq!(endpoint.host(), ApiHost::Enterprise);
+        assert_eq!(endpoint.version(), ApiVersion::V3);
+
+        let endpoint = Endpoint::new(ApiHost::Public, ApiVersion::V2);
+        assert_eq!(endpoint.host(), ApiHost::Public);
+        assert_eq!(endpoint.version(), ApiVersion::V2);
+    }
+
+    #[test]
+    fn test_endpoint_quote_urls() {
+        assert_eq!(
+            Endpoint::public_v2().quote_url().as_str(),
+            "https://api.odos.xyz/sor/quote/v2"
+        );
+        assert_eq!(
+            Endpoint::public_v3().quote_url().as_str(),
+            "https://api.odos.xyz/sor/quote/v3"
+        );
+        assert_eq!(
+            Endpoint::enterprise_v2().quote_url().as_str(),
+            "https://enterprise-api.odos.xyz/sor/quote/v2"
+        );
+        assert_eq!(
+            Endpoint::enterprise_v3().quote_url().as_str(),
+            "https://enterprise-api.odos.xyz/sor/quote/v3"
+        );
+    }
+
+    #[test]
+    fn test_endpoint_assemble_urls() {
+        assert_eq!(
+            Endpoint::public_v2().assemble_url().as_str(),
+            "https://api.odos.xyz/sor/assemble"
+        );
+        assert_eq!(
+            Endpoint::public_v3().assemble_url().as_str(),
+            "https://api.odos.xyz/sor/assemble"
+        );
+        assert_eq!(
+            Endpoint::enterprise_v2().assemble_url().as_str(),
+            "https://enterprise-api.odos.xyz/sor/assemble"
+        );
+        assert_eq!(
+            Endpoint::enterprise_v3().assemble_url().as_str(),
+            "https://enterprise-api.odos.xyz/sor/assemble"
+        );
+    }
+
+    #[test]
+    fn test_endpoint_default() {
+        let endpoint = Endpoint::default();
+        assert_eq!(endpoint.host(), ApiHost::Public);
+        assert_eq!(endpoint.version(), ApiVersion::V2);
+        assert_eq!(
+            endpoint.quote_url().as_str(),
+            "https://api.odos.xyz/sor/quote/v2"
+        );
+    }
+
+    #[test]
+    fn test_endpoint_equality() {
+        assert_eq!(
+            Endpoint::public_v2(),
+            Endpoint::new(ApiHost::Public, ApiVersion::V2)
+        );
+        assert_eq!(
+            Endpoint::enterprise_v3(),
+            Endpoint::new(ApiHost::Enterprise, ApiVersion::V3)
+        );
+        assert_ne!(Endpoint::public_v2(), Endpoint::public_v3());
+        assert_ne!(Endpoint::public_v2(), Endpoint::enterprise_v2());
+    }
+
+    #[test]
+    fn test_odos_api_error_response_accepts_null_trace_id() {
+        let body = r#"{"detail":"x","traceId":null,"errorCode":2999}"#;
+        let parsed: OdosApiErrorResponse = serde_json::from_str(body).unwrap();
+        assert_eq!(parsed.trace_id, None);
+        assert_eq!(
+            parsed.error_code,
+            crate::error_code::OdosErrorCode::AlgoInternal.code()
+        );
+    }
+
+    #[test]
+    fn test_odos_api_error_response_accepts_missing_trace_id() {
+        let body = r#"{"detail":"x","errorCode":2999}"#;
+        let parsed: OdosApiErrorResponse = serde_json::from_str(body).unwrap();
+        assert_eq!(parsed.trace_id, None);
+        assert_eq!(
+            parsed.error_code,
+            crate::error_code::OdosErrorCode::AlgoInternal.code()
+        );
+    }
+
+    #[test]
+    fn test_odos_api_error_response_accepts_present_trace_id() {
+        let body =
+            r#"{"detail":"x","traceId":"10becdc8-a021-4491-8201-a17b657204e0","errorCode":2999}"#;
+        let parsed: OdosApiErrorResponse = serde_json::from_str(body).unwrap();
+        assert!(parsed.trace_id.is_some());
+        assert_eq!(
+            parsed.error_code,
+            crate::error_code::OdosErrorCode::AlgoInternal.code()
+        );
     }
 }

@@ -1,39 +1,645 @@
+// SPDX-FileCopyrightText: 2025 Semiotic AI, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
+
 use alloy_chains::NamedChain;
 use alloy_primitives::Address;
+use thiserror::Error;
 
 use crate::{
-    ODOS_V2_ARBITRUM_ROUTER, ODOS_V2_AVALANCHE_ROUTER, ODOS_V2_BASE_ROUTER, ODOS_V2_BSC_ROUTER,
-    ODOS_V2_ETHEREUM_ROUTER, ODOS_V2_FANTOM_ROUTER, ODOS_V2_FRAXTAL_ROUTER, ODOS_V2_LINEA_ROUTER,
-    ODOS_V2_MANTLE_ROUTER, ODOS_V2_MODE_ROUTER, ODOS_V2_OP_ROUTER, ODOS_V2_POLYGON_ROUTER,
-    ODOS_V2_SCROLL_ROUTER, ODOS_V2_SONIC_ROUTER, ODOS_V2_ZKSYNC_ROUTER,
+    RouterAvailability, ODOS_LO_ARBITRUM_ROUTER, ODOS_LO_AVALANCHE_ROUTER, ODOS_LO_BASE_ROUTER,
+    ODOS_LO_BSC_ROUTER, ODOS_LO_ETHEREUM_ROUTER, ODOS_LO_FRAXTAL_ROUTER, ODOS_LO_LINEA_ROUTER,
+    ODOS_LO_MANTLE_ROUTER, ODOS_LO_OP_ROUTER, ODOS_LO_POLYGON_ROUTER, ODOS_LO_SONIC_ROUTER,
+    ODOS_LO_UNICHAIN_ROUTER, ODOS_LO_ZKSYNC_ROUTER, ODOS_V2_ARBITRUM_ROUTER,
+    ODOS_V2_AVALANCHE_ROUTER, ODOS_V2_BASE_ROUTER, ODOS_V2_BSC_ROUTER, ODOS_V2_ETHEREUM_ROUTER,
+    ODOS_V2_FRAXTAL_ROUTER, ODOS_V2_LINEA_ROUTER, ODOS_V2_MANTLE_ROUTER, ODOS_V2_OP_ROUTER,
+    ODOS_V2_POLYGON_ROUTER, ODOS_V2_SONIC_ROUTER, ODOS_V2_UNICHAIN_ROUTER, ODOS_V2_ZKSYNC_ROUTER,
+    ODOS_V3,
 };
 
+/// Errors that can occur when working with Odos chains
+#[derive(Error, Debug, Clone, PartialEq)]
+pub enum OdosChainError {
+    /// The chain is not supported by Odos protocol
+    #[error("Chain {chain:?} is not supported by Odos protocol")]
+    UnsupportedChain { chain: String },
+
+    /// The Limit Order router is not available on this chain
+    #[error("Odos Limit Order router is not available on chain {chain:?}")]
+    LimitOrderNotAvailable { chain: String },
+
+    /// The V2 router is not available on this chain
+    #[error("Odos V2 router is not available on chain {chain:?}")]
+    V2NotAvailable { chain: String },
+
+    /// The V3 router is not available on this chain
+    #[error("Odos V3 router is not available on chain {chain:?}")]
+    V3NotAvailable { chain: String },
+
+    /// Invalid address format
+    #[error("Invalid address format: {address}")]
+    InvalidAddress { address: String },
+}
+
+/// Result type for Odos chain operations
+pub type OdosChainResult<T> = Result<T, OdosChainError>;
+
+/// Trait for chains that support Odos protocol
+///
+/// This trait provides a type-safe way to access Odos router addresses
+/// for supported blockchain networks, integrating seamlessly with the
+/// Alloy ecosystem.
+///
+/// # Examples
+///
+/// ```rust
+/// use odos_sdk::OdosChain;
+/// use alloy_chains::NamedChain;
+///
+/// // Get router addresses
+/// let lo_router = NamedChain::Mainnet.lo_router_address()?;
+/// let v2_router = NamedChain::Mainnet.v2_router_address()?;
+/// let v3_router = NamedChain::Mainnet.v3_router_address()?;
+///
+/// // Check router support
+/// assert!(NamedChain::Mainnet.supports_odos());
+/// assert!(NamedChain::Mainnet.supports_lo());
+/// assert!(NamedChain::Mainnet.supports_v2());
+/// assert!(NamedChain::Mainnet.supports_v3());
+///
+/// // Get router availability
+/// let availability = NamedChain::Mainnet.router_availability();
+/// assert!(availability.limit_order && availability.v2 && availability.v3);
+/// # Ok::<(), odos_sdk::OdosChainError>(())
+/// ```
 pub trait OdosChain {
-    fn v2_router_address(&self) -> Address;
+    /// Get the Limit Order V2 router address for this chain
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(Address)` - The LO router contract address
+    /// * `Err(OdosChainError)` - If the chain doesn't support LO or address is invalid
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use odos_sdk::OdosChain;
+    /// use alloy_chains::NamedChain;
+    ///
+    /// let address = NamedChain::Mainnet.lo_router_address()?;
+    /// # Ok::<(), odos_sdk::OdosChainError>(())
+    /// ```
+    fn lo_router_address(&self) -> OdosChainResult<Address>;
+    /// Get the V2 router address for this chain
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(Address)` - The V2 router contract address
+    /// * `Err(OdosChainError)` - If the chain is not supported or address is invalid
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use odos_sdk::OdosChain;
+    /// use alloy_chains::NamedChain;
+    ///
+    /// let address = NamedChain::Mainnet.v2_router_address()?;
+    /// # Ok::<(), odos_sdk::OdosChainError>(())
+    /// ```
+    fn v2_router_address(&self) -> OdosChainResult<Address>;
+
+    /// Get the V3 router address for this chain
+    ///
+    /// V3 uses the same address across all supported chains,
+    /// following CREATE2 deterministic deployment.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(Address)` - The V3 router contract address
+    /// * `Err(OdosChainError)` - If the chain is not supported or address is invalid
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use odos_sdk::OdosChain;
+    /// use alloy_chains::NamedChain;
+    ///
+    /// let address = NamedChain::Mainnet.v3_router_address()?;
+    /// # Ok::<(), odos_sdk::OdosChainError>(())
+    /// ```
+    fn v3_router_address(&self) -> OdosChainResult<Address>;
+
+    /// Check if this chain supports Odos protocol
+    ///
+    /// # Returns
+    ///
+    /// `true` if any router (LO, V2, or V3) is supported on this chain
+    fn supports_odos(&self) -> bool;
+
+    /// Check if this chain supports Odos Limit Order
+    ///
+    /// # Returns
+    ///
+    /// `true` if LO is supported on this chain
+    fn supports_lo(&self) -> bool;
+
+    /// Check if this chain supports Odos V2
+    ///
+    /// # Returns
+    ///
+    /// `true` if V2 is supported on this chain
+    fn supports_v2(&self) -> bool;
+
+    /// Check if this chain supports Odos V3
+    ///
+    /// # Returns
+    ///
+    /// `true` if V3 is supported on this chain
+    fn supports_v3(&self) -> bool;
+
+    /// Get router availability for this chain
+    ///
+    /// # Returns
+    ///
+    /// A `RouterAvailability` struct indicating which routers are available
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use odos_sdk::OdosChain;
+    /// use alloy_chains::NamedChain;
+    ///
+    /// let availability = NamedChain::Mainnet.router_availability();
+    /// assert!(availability.limit_order);
+    /// assert!(availability.v2);
+    /// assert!(availability.v3);
+    /// ```
+    fn router_availability(&self) -> RouterAvailability {
+        RouterAvailability {
+            limit_order: self.supports_lo(),
+            v2: self.supports_v2(),
+            v3: self.supports_v3(),
+        }
+    }
+
+    /// Try to get the LO router address without errors
+    ///
+    /// # Returns
+    ///
+    /// `Some(address)` if supported, `None` if not supported
+    fn try_lo_router_address(&self) -> Option<Address> {
+        self.lo_router_address().ok()
+    }
+
+    /// Try to get the V2 router address without errors
+    ///
+    /// # Returns
+    ///
+    /// `Some(address)` if supported, `None` if not supported
+    fn try_v2_router_address(&self) -> Option<Address> {
+        self.v2_router_address().ok()
+    }
+
+    /// Try to get the V3 router address without errors
+    ///
+    /// # Returns
+    ///
+    /// `Some(address)` if supported, `None` if not supported
+    fn try_v3_router_address(&self) -> Option<Address> {
+        self.v3_router_address().ok()
+    }
 }
 
 impl OdosChain for NamedChain {
-    fn v2_router_address(&self) -> Address {
+    fn lo_router_address(&self) -> OdosChainResult<Address> {
         use NamedChain::*;
-        match self {
+
+        if !self.supports_odos() {
+            return Err(OdosChainError::LimitOrderNotAvailable {
+                chain: format!("{self:?}"),
+            });
+        }
+
+        if !self.supports_lo() {
+            return Err(OdosChainError::LimitOrderNotAvailable {
+                chain: format!("{self:?}"),
+            });
+        }
+
+        Ok(match self {
+            Arbitrum => ODOS_LO_ARBITRUM_ROUTER,
+            Avalanche => ODOS_LO_AVALANCHE_ROUTER,
+            Base => ODOS_LO_BASE_ROUTER,
+            BinanceSmartChain => ODOS_LO_BSC_ROUTER,
+            Fraxtal => ODOS_LO_FRAXTAL_ROUTER,
+            Mainnet => ODOS_LO_ETHEREUM_ROUTER,
+            Optimism => ODOS_LO_OP_ROUTER,
+            Polygon => ODOS_LO_POLYGON_ROUTER,
+            Linea => ODOS_LO_LINEA_ROUTER,
+            Mantle => ODOS_LO_MANTLE_ROUTER,
+            Sonic => ODOS_LO_SONIC_ROUTER,
+            ZkSync => ODOS_LO_ZKSYNC_ROUTER,
+            Unichain => ODOS_LO_UNICHAIN_ROUTER,
+            _ => {
+                return Err(OdosChainError::LimitOrderNotAvailable {
+                    chain: format!("{self:?}"),
+                });
+            }
+        })
+    }
+
+    fn v2_router_address(&self) -> OdosChainResult<Address> {
+        use NamedChain::*;
+
+        if !self.supports_odos() {
+            return Err(OdosChainError::V2NotAvailable {
+                chain: format!("{self:?}"),
+            });
+        }
+
+        // If V2 is not available on this chain, fall back to V3
+        if !self.supports_v2() {
+            return self.v3_router_address();
+        }
+
+        Ok(match self {
             Arbitrum => ODOS_V2_ARBITRUM_ROUTER,
             Avalanche => ODOS_V2_AVALANCHE_ROUTER,
             Base => ODOS_V2_BASE_ROUTER,
             BinanceSmartChain => ODOS_V2_BSC_ROUTER,
-            Fantom => ODOS_V2_FANTOM_ROUTER,
             Fraxtal => ODOS_V2_FRAXTAL_ROUTER,
             Mainnet => ODOS_V2_ETHEREUM_ROUTER,
             Optimism => ODOS_V2_OP_ROUTER,
             Polygon => ODOS_V2_POLYGON_ROUTER,
             Linea => ODOS_V2_LINEA_ROUTER,
             Mantle => ODOS_V2_MANTLE_ROUTER,
-            Mode => ODOS_V2_MODE_ROUTER,
-            Scroll => ODOS_V2_SCROLL_ROUTER,
             Sonic => ODOS_V2_SONIC_ROUTER,
             ZkSync => ODOS_V2_ZKSYNC_ROUTER,
-            _ => unimplemented!(),
+            Unichain => ODOS_V2_UNICHAIN_ROUTER,
+            _ => {
+                return Err(OdosChainError::UnsupportedChain {
+                    chain: format!("{self:?}"),
+                });
+            }
+        })
+    }
+
+    fn v3_router_address(&self) -> OdosChainResult<Address> {
+        if !self.supports_odos() {
+            return Err(OdosChainError::V3NotAvailable {
+                chain: format!("{self:?}"),
+            });
         }
-        .parse()
-        .unwrap()
+
+        // If V3 is not available on this chain, fall back to V2
+        if !self.supports_v3() {
+            return self.v2_router_address();
+        }
+
+        Ok(ODOS_V3)
+    }
+
+    fn supports_odos(&self) -> bool {
+        use NamedChain::*;
+        matches!(
+            self,
+            Arbitrum
+                | Avalanche
+                | Base
+                | BinanceSmartChain
+                | Fraxtal
+                | Mainnet
+                | Optimism
+                | Polygon
+                | Linea
+                | Mantle
+                | Sonic
+                | ZkSync
+                | Unichain
+        )
+    }
+
+    fn supports_lo(&self) -> bool {
+        use NamedChain::*;
+        matches!(
+            self,
+            Arbitrum
+                | Avalanche
+                | Base
+                | BinanceSmartChain
+                | Fraxtal
+                | Mainnet
+                | Optimism
+                | Polygon
+                | Linea
+                | Mantle
+                | Sonic
+                | ZkSync
+                | Unichain
+        )
+    }
+
+    fn supports_v2(&self) -> bool {
+        use NamedChain::*;
+        matches!(
+            self,
+            Arbitrum
+                | Avalanche
+                | Base
+                | BinanceSmartChain
+                | Fraxtal
+                | Mainnet
+                | Optimism
+                | Polygon
+                | Linea
+                | Mantle
+                | Sonic
+                | ZkSync
+                | Unichain
+        )
+    }
+
+    fn supports_v3(&self) -> bool {
+        use NamedChain::*;
+        matches!(
+            self,
+            Arbitrum
+                | Avalanche
+                | Base
+                | BinanceSmartChain
+                | Fraxtal
+                | Mainnet
+                | Optimism
+                | Polygon
+                | Linea
+                | Mantle
+                | Sonic
+                | ZkSync
+                | Unichain
+        )
+    }
+}
+
+/// Extension trait for easy router selection
+///
+/// This trait provides convenient methods for choosing between V2 and V3
+/// routers based on your requirements.
+pub trait OdosRouterSelection: OdosChain {
+    /// Get the recommended router address for this chain
+    ///
+    /// Currently defaults to V3 for enhanced features, but this
+    /// may change based on performance characteristics.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(Address)` - The recommended router address
+    /// * `Err(OdosChainError)` - If the chain is not supported
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use odos_sdk::{OdosChain, OdosRouterSelection};
+    /// use alloy_chains::NamedChain;
+    ///
+    /// let address = NamedChain::Base.recommended_router_address()?;
+    /// # Ok::<(), odos_sdk::OdosChainError>(())
+    /// ```
+    fn recommended_router_address(&self) -> OdosChainResult<Address> {
+        self.v3_router_address()
+    }
+
+    /// Get router address with fallback strategy
+    ///
+    /// Tries V3 first, falls back to V2 if needed.
+    /// This is useful for maximum compatibility.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(Address)` - V3 address if available, otherwise V2 address
+    /// * `Err(OdosChainError)` - If neither version is supported
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use odos_sdk::{OdosChain, OdosRouterSelection};
+    /// use alloy_chains::NamedChain;
+    ///
+    /// let address = NamedChain::Mainnet.router_address_with_fallback()?;
+    /// # Ok::<(), odos_sdk::OdosChainError>(())
+    /// ```
+    fn router_address_with_fallback(&self) -> OdosChainResult<Address> {
+        self.v3_router_address()
+            .or_else(|_| self.v2_router_address())
+    }
+
+    /// Get router address based on preference
+    ///
+    /// # Arguments
+    ///
+    /// * `prefer_v3` - Whether to prefer V3 when both are available
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(Address)` - The appropriate router address based on preference
+    /// * `Err(OdosChainError)` - If the preferred version is not supported
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use odos_sdk::{OdosChain, OdosRouterSelection};
+    /// use alloy_chains::NamedChain;
+    ///
+    /// let v3_address = NamedChain::Mainnet.router_address_by_preference(true)?;
+    /// let v2_address = NamedChain::Mainnet.router_address_by_preference(false)?;
+    /// # Ok::<(), odos_sdk::OdosChainError>(())
+    /// ```
+    fn router_address_by_preference(&self, prefer_v3: bool) -> OdosChainResult<Address> {
+        if prefer_v3 {
+            self.v3_router_address()
+        } else {
+            self.v2_router_address()
+        }
+    }
+}
+
+impl<T: OdosChain> OdosRouterSelection for T {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_chains::NamedChain;
+
+    #[test]
+    fn test_lo_router_addresses() {
+        let chains = [
+            NamedChain::Mainnet,
+            NamedChain::Optimism,
+            NamedChain::Polygon,
+            NamedChain::BinanceSmartChain,
+        ];
+
+        for chain in chains {
+            let address = chain.lo_router_address().unwrap();
+            assert!(address != Address::ZERO);
+            assert_eq!(address.to_string().len(), 42); // 0x + 40 hex chars
+        }
+    }
+
+    #[test]
+    fn test_v2_router_addresses() {
+        let chains = [
+            NamedChain::Mainnet,
+            NamedChain::Arbitrum,
+            NamedChain::Optimism,
+            NamedChain::Polygon,
+            NamedChain::Base,
+        ];
+
+        for chain in chains {
+            let address = chain.v2_router_address().unwrap();
+            assert!(address != Address::ZERO);
+            assert_eq!(address.to_string().len(), 42); // 0x + 40 hex chars
+        }
+    }
+
+    #[test]
+    fn test_v3_router_addresses() {
+        let chains = [
+            NamedChain::Mainnet,
+            NamedChain::Arbitrum,
+            NamedChain::Optimism,
+            NamedChain::Polygon,
+            NamedChain::Base,
+        ];
+
+        for chain in chains {
+            let address = chain.v3_router_address().unwrap();
+            assert_eq!(address, ODOS_V3);
+        }
+    }
+
+    #[test]
+    fn test_supports_odos() {
+        assert!(NamedChain::Mainnet.supports_odos());
+        assert!(NamedChain::Arbitrum.supports_odos());
+        assert!(!NamedChain::Sepolia.supports_odos());
+    }
+
+    #[test]
+    fn test_supports_lo() {
+        assert!(NamedChain::Mainnet.supports_lo());
+        assert!(NamedChain::Optimism.supports_lo());
+        assert!(NamedChain::Polygon.supports_lo());
+        assert!(NamedChain::BinanceSmartChain.supports_lo());
+        assert!(NamedChain::Arbitrum.supports_lo());
+        assert!(NamedChain::Base.supports_lo());
+        assert!(!NamedChain::Sepolia.supports_lo());
+    }
+
+    #[test]
+    fn test_supports_v2() {
+        assert!(NamedChain::Mainnet.supports_v2());
+        assert!(NamedChain::Arbitrum.supports_v2());
+        assert!(!NamedChain::Sepolia.supports_v2());
+    }
+
+    #[test]
+    fn test_supports_v3() {
+        assert!(NamedChain::Mainnet.supports_v3());
+        assert!(NamedChain::Arbitrum.supports_v3());
+        assert!(!NamedChain::Sepolia.supports_v3());
+    }
+
+    #[test]
+    fn test_router_availability() {
+        // Ethereum: all routers
+        let avail = NamedChain::Mainnet.router_availability();
+        assert!(avail.limit_order);
+        assert!(avail.v2);
+        assert!(avail.v3);
+        assert_eq!(avail.count(), 3);
+
+        // Arbitrum: all routers
+        let avail = NamedChain::Arbitrum.router_availability();
+        assert!(avail.limit_order);
+        assert!(avail.v2);
+        assert!(avail.v3);
+        assert_eq!(avail.count(), 3);
+
+        // Sepolia: none
+        let avail = NamedChain::Sepolia.router_availability();
+        assert!(!avail.limit_order);
+        assert!(!avail.v2);
+        assert!(!avail.v3);
+        assert_eq!(avail.count(), 0);
+        assert!(!avail.has_any());
+    }
+
+    #[test]
+    fn test_try_methods() {
+        assert!(NamedChain::Mainnet.try_lo_router_address().is_some());
+        assert!(NamedChain::Mainnet.try_v2_router_address().is_some());
+        assert!(NamedChain::Mainnet.try_v3_router_address().is_some());
+
+        assert!(NamedChain::Sepolia.try_lo_router_address().is_none());
+        assert!(NamedChain::Sepolia.try_v2_router_address().is_none());
+        assert!(NamedChain::Sepolia.try_v3_router_address().is_none());
+
+        // Arbitrum has all routers
+        assert!(NamedChain::Arbitrum.try_lo_router_address().is_some());
+        assert!(NamedChain::Arbitrum.try_v2_router_address().is_some());
+        assert!(NamedChain::Arbitrum.try_v3_router_address().is_some());
+    }
+
+    #[test]
+    fn test_router_selection() {
+        let chain = NamedChain::Mainnet;
+
+        // Recommended should be V3
+        assert_eq!(
+            chain.recommended_router_address().unwrap(),
+            chain.v3_router_address().unwrap()
+        );
+
+        // Fallback should also be V3 (since both are supported)
+        assert_eq!(
+            chain.router_address_with_fallback().unwrap(),
+            chain.v3_router_address().unwrap()
+        );
+
+        // Preference-based selection
+        assert_eq!(
+            chain.router_address_by_preference(true).unwrap(),
+            chain.v3_router_address().unwrap()
+        );
+        assert_eq!(
+            chain.router_address_by_preference(false).unwrap(),
+            chain.v2_router_address().unwrap()
+        );
+    }
+
+    #[test]
+    fn test_error_handling() {
+        // Test unsupported chain
+        let result = NamedChain::Sepolia.lo_router_address();
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            OdosChainError::LimitOrderNotAvailable { .. }
+        ));
+
+        let result = NamedChain::Sepolia.v2_router_address();
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            OdosChainError::V2NotAvailable { .. }
+        ));
+
+        let result = NamedChain::Sepolia.v3_router_address();
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            OdosChainError::V3NotAvailable { .. }
+        ));
     }
 }

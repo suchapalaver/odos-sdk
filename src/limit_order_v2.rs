@@ -1,13 +1,17 @@
+// SPDX-FileCopyrightText: 2025 Semiotic AI, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
+
 use std::{fmt::Debug, marker::PhantomData};
 
-use OdosLimitOrderRouter::TokenInfo;
-use OdosLimitOrderV2::OdosLimitOrderV2Instance;
 use alloy_contract::CallBuilder;
 use alloy_network::Ethereum;
 use alloy_primitives::{Address, U256};
 use alloy_provider::Provider;
 use alloy_rpc_types::TransactionRequest;
 use alloy_sol_types::sol;
+use OdosLimitOrderRouter::TokenInfo;
+use OdosLimitOrderV2::OdosLimitOrderV2Instance;
 
 use crate::SwapInputs;
 
@@ -30,6 +34,13 @@ impl<P: Provider<Ethereum>> LimitOrderV2<P> {
 
     pub async fn owner(&self) -> Result<Address, alloy_contract::Error> {
         self.instance.owner().call().await
+    }
+
+    pub fn change_liquidator_address(
+        &self,
+        account: Address,
+    ) -> CallBuilder<&P, PhantomData<OdosLimitOrderV2::changeLiquidatorAddressCall>> {
+        self.instance.changeLiquidatorAddress(account)
     }
 
     pub fn build_swap_router_funds_call(
@@ -106,8 +117,25 @@ impl Debug for OdosLimitOrderRouter::TokenInfo {
 
 // codegen the odos_limit_order_v2 contract
 sol!(
-    #[allow(missing_docs)]
+    #[allow(missing_docs, clippy::too_many_arguments)]
     #[sol(rpc)]
     OdosLimitOrderV2,
     "abis/odos_limit_order_v2.json"
 );
+
+// Re-export event types for consumers who need to decode limit order events.
+// These events are fundamentally different from the Swap/SwapMulti events
+// emitted by V2/V3 routers.
+pub use OdosLimitOrderV2::{
+    // Administrative events
+    AllowedFillerAdded,
+    AllowedFillerRemoved,
+    // Primary limit order events
+    LimitOrderCancelled,
+    LimitOrderFilled,
+    LiquidatorAddressChanged,
+    MultiLimitOrderCancelled,
+    MultiLimitOrderFilled,
+    OrderPreSigned,
+    SwapRouterFunds,
+};

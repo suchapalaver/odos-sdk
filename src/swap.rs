@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2025 Semiotic AI, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
+
 use std::fmt::Display;
 
 use alloy_chains::NamedChain;
@@ -5,9 +9,12 @@ use alloy_primitives::{Address, U256};
 use bon::Builder;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-/// A token swap.
+/// Request for assembling a transaction from a quote
+///
+/// Contains all the information needed to assemble a transaction from
+/// a quote path ID, including signer address, recipient, and routing details.
 #[derive(Builder, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct Swap {
+pub struct AssemblyRequest {
     /// The chain of the swap.
     chain: NamedChain,
     /// The address of the router.
@@ -24,7 +31,7 @@ pub struct Swap {
     path_id: String,
 }
 
-impl Swap {
+impl AssemblyRequest {
     pub fn chain(&self) -> NamedChain {
         self.chain
     }
@@ -54,7 +61,7 @@ impl Swap {
     }
 }
 
-impl Serialize for Swap {
+impl Serialize for AssemblyRequest {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -73,7 +80,7 @@ impl Serialize for Swap {
     }
 }
 
-impl<'de> Deserialize<'de> for Swap {
+impl<'de> Deserialize<'de> for AssemblyRequest {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -91,7 +98,7 @@ impl<'de> Deserialize<'de> for Swap {
 
         let chain = NamedChain::try_from(chain_id).map_err(serde::de::Error::custom)?;
 
-        Ok(Swap {
+        Ok(Self {
             chain,
             router_address,
             signer_address,
@@ -103,7 +110,7 @@ impl<'de> Deserialize<'de> for Swap {
     }
 }
 
-impl Display for Swap {
+impl Display for AssemblyRequest {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -118,3 +125,10 @@ impl Display for Swap {
         )
     }
 }
+
+/// Deprecated alias for [`AssemblyRequest`]
+///
+/// This type alias is provided for backward compatibility.
+/// Use [`AssemblyRequest`] instead in new code.
+#[deprecated(since = "0.25.0", note = "Use `AssemblyRequest` instead")]
+pub type SwapContext = AssemblyRequest;
