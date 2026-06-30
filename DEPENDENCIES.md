@@ -21,12 +21,12 @@ The SDK heavily relies on the [Alloy](https://github.com/alloy-rs/alloy) suite o
 #### alloy-chains (0.2.x)
 
 - **Purpose**: Chain ID definitions and type-safe chain support
-- **Why this version**: alloy-chains is in a separate repository (github.com/alloy-rs/chains) with its own versioning - 0.2.x is the latest stable series and is fully compatible with alloy 1.x
-- **Current version**: 0.2.25 (latest)
+- **Why this version**: alloy-chains is in a separate repository (github.com/alloy-rs/chains) with its own versioning - 0.2.x is the latest stable series and remains compatible with the current Alloy ecosystem
+- **Current version**: 0.2.x
 - **Usage**: Provides `NamedChain` enum and chain-specific configurations
-- **Note**: Despite different major version numbers, alloy-chains 0.2.x is designed to work with alloy 1.x
+- **Note**: Despite different major version numbers, alloy-chains 0.2.x is designed to work with the current Alloy crates
 
-#### alloy-primitives (1.5.x)
+#### alloy-primitives (1.6.x)
 
 - **Purpose**: Core Ethereum types (`Address`, `U256`, `Bytes`, etc.)
 - **Features enabled**:
@@ -35,24 +35,24 @@ The SDK heavily relies on the [Alloy](https://github.com/alloy-rs/alloy) suite o
 - **Why this version**: Latest stable release with excellent performance and ergonomics
 - **Usage**: All address handling, amount calculations, and hex encoding
 
-#### alloy-contract (1.3.x)
+#### alloy-contract (2.1.x)
 
 - **Purpose**: Contract interaction abstractions
 - **Features**: `default-features = false` for fine-grained control
 - **Usage**: Used for contract bindings and transaction assembly
 
-#### alloy-sol-types (1.5.x)
+#### alloy-sol-types (1.6.x)
 
 - **Purpose**: Solidity type definitions and ABI encoding/decoding
 - **Features enabled**: `json` for ABI JSON support
 - **Usage**: V2/V3 router contract ABIs and transaction encoding
 
-#### alloy-sol-type-parser (1.5.x)
+#### alloy-sol-type-parser (1.6.x)
 
 - **Purpose**: Parsing Solidity type strings at compile time
 - **Usage**: Contract macro expansion for type-safe ABI bindings
 
-#### alloy-provider (1.3.x)
+#### alloy-provider (2.1.x)
 
 - **Purpose**: RPC provider abstractions for Ethereum node communication
 - **Features enabled**:
@@ -60,19 +60,19 @@ The SDK heavily relies on the [Alloy](https://github.com/alloy-rs/alloy) suite o
   - `reqwest`: HTTP transport via reqwest
 - **Usage**: Transaction simulation and submission
 
-#### alloy-signer (1.3.x), alloy-signer-local (1.3.x)
+#### alloy-signer (2.1.x), alloy-signer-local (2.1.x)
 
 - **Purpose**: Transaction signing abstractions and local wallet support
 - **Features**: `default-features = false` to avoid unnecessary dependencies
 - **Usage**: Transaction signing for swap execution
 
-#### alloy-network (1.3.x)
+#### alloy-network (2.1.x)
 
 - **Purpose**: Network-level abstractions (mainnet, testnet, etc.)
 - **Features**: `default-features = false`
 - **Usage**: Network-aware transaction building
 
-#### alloy-rpc-* crates (1.3.x)
+#### alloy-rpc-* crates (2.1.x)
 
 - **alloy-rpc-client**: Low-level RPC client
 - **alloy-rpc-types**: RPC type definitions
@@ -80,7 +80,7 @@ The SDK heavily relies on the [Alloy](https://github.com/alloy-rs/alloy) suite o
 - **Purpose**: HTTP communication with Ethereum nodes and services
 - **Usage**: Contract calls and transaction submission
 
-#### alloy-transport (1.3.x), alloy-transport-http (1.3.x)
+#### alloy-transport (2.1.x), alloy-transport-http (2.1.x)
 
 - **Purpose**: Transport layer for RPC communications
 - **Features**: `reqwest` for HTTP support
@@ -88,10 +88,13 @@ The SDK heavily relies on the [Alloy](https://github.com/alloy-rs/alloy) suite o
 
 **Version Strategy**: The alloy ecosystem consists of two repositories:
 
-1. **alloy-rs/alloy** (1.x): Main alloy crates for Ethereum interactions
-2. **alloy-rs/chains** (0.2.x): Chain definitions maintained separately
+1. **alloy-rs/alloy** (2.x): Main Alloy crates for Ethereum interactions
+2. **alloy-rs/core** (1.x): Core primitive, ABI, and Solidity macro crates
+3. **alloy-rs/chains** (0.2.x): Chain definitions maintained separately
 
-Both are fully compatible despite different version numbers. We use the latest stable from each repository.
+These repositories intentionally have different version numbers. We keep direct
+dependencies on the current stable release line from each repository and update
+them together when Alloy publishes a new compatible minor release.
 
 ### HTTP Client
 
@@ -258,12 +261,10 @@ These are NOT explicitly declared but come from our direct dependencies:
 - `cargo deny` checks licenses and advisories
 - `cargo outdated` runs weekly to check for updates
 
-## Future Improvements (Post-1.0 Roadmap)
+## Future Improvements
 
-1. **Feature Flags** (1.0.0):
+1. **Feature Flags**:
    - Make `tracing` optional
-   - Make `alloy-provider` optional for users who only want quote fetching
-   - Add `full` feature for all functionality
 
 2. **Dependency Reduction** (Completed in 1.0.0):
    - ✅ Replaced `backoff` with `backon`
@@ -297,5 +298,5 @@ This project builds on the excellent work of the Rust and Ethereum communities, 
 
 ---
 
-**Last Updated**: 2026-01-12 (Version 2.0.0)
-**Next Review**: Before 2.1.0 release
+**Last Updated**: 2026-06-30 (Alloy 2.1.0)
+**Next Review**: Before the next Alloy minor release

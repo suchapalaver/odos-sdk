@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Update the direct Alloy 2.x dependency line from `2.0` to `2.1`,
+  keeping `alloy-primitives` and `alloy-sol-types` on the current Alloy Core
+  `1.6` line.
+
 ## [11.0.2] - 2026-05-27
 
 ### Changed
