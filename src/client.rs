@@ -63,12 +63,12 @@ pub enum RetryPredicate {
 /// // Conservative retries - only network errors
 /// let config = RetryConfig::conservative();
 ///
-/// // Default retries - network errors and server errors
+/// // Default retry budget - up to 3 total attempts for retryable errors
 /// let config = RetryConfig::default();
 ///
 /// // Replace the default policy with custom logic
 /// let config = RetryConfig {
-///     max_retries: 2,
+///     max_retries: 2, // up to 2 total attempts
 ///     retry_server_errors: false,
 ///     retry_predicate: RetryPredicate::Replace(|err| {
 ///         // Custom logic to determine if error should be retried
@@ -85,7 +85,12 @@ pub enum RetryPredicate {
 /// ```
 #[derive(Debug, Clone)]
 pub struct RetryConfig {
-    /// Maximum retry attempts for retryable errors
+    /// Maximum total attempts for retryable errors.
+    ///
+    /// A value of `0` disables retries but still allows the initial request.
+    /// Nonzero values cap the whole request lifecycle, including the initial
+    /// attempt. For example, `3` means at most one initial attempt plus two
+    /// retries.
     pub max_retries: u32,
 
     /// Initial backoff duration in milliseconds
@@ -111,7 +116,7 @@ impl Default for RetryConfig {
 }
 
 impl RetryConfig {
-    /// No retries - return errors immediately
+    /// No retries - return retryable errors after the initial attempt
     ///
     /// Use this when you want to handle all errors at the application level,
     /// or when implementing your own retry logic.
@@ -216,7 +221,7 @@ pub struct ClientConfig {
     /// Controls which errors trigger retries and how retries are executed.
     /// See [`RetryConfig`] for detailed retry configuration options.
     ///
-    /// Default: 3 retries with exponential backoff
+    /// Default: up to 3 total attempts with exponential backoff
     pub retry_config: RetryConfig,
 
     /// Maximum concurrent connections per host
@@ -358,7 +363,8 @@ impl OdosHttpClient {
         let initial_backoff_duration =
             Duration::from_millis(self.config.retry_config.initial_backoff_ms);
 
-        // +1 because backon counts total attempts, not retries
+        // `should_retry` is the source of truth for the total attempt budget.
+        // Keep the backoff iterator from exhausting before that gate.
         let backoff = ExponentialBuilder::default()
             .with_min_delay(initial_backoff_duration)
             .with_max_delay(Duration::from_secs(30))
@@ -461,7 +467,7 @@ impl OdosHttpClient {
     /// [`OdosErrorCode`](crate::error_code::OdosErrorCode) classification is
     /// the single source of truth for whether an API error warrants another
     /// attempt. The retry configuration adds these gates on top:
-    /// - NEVER retry past `max_retries` attempts.
+    /// - NEVER retry beyond the total attempt budget in `max_retries`.
     /// - The [`RetryPredicate`] in `retry_predicate` chooses how a caller
     ///   predicate composes with the default tree:
     ///   - [`RetryPredicate::Default`] runs only the default tree.
@@ -1378,6 +1384,36 @@ mod tests {
         if let Err(e) = response {
             assert!(
                 matches!(e, OdosError::Api { status, .. } if status == StatusCode::INTERNAL_SERVER_ERROR)
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_max_retries_counts_total_attempts_for_retryable_api_errors() {
+        for (max_retries, expected_attempts) in [(0, 1), (1, 1), (2, 2), (3, 3)] {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/test"))
+                .respond_with(ResponseTemplate::new(503).set_body_string("Service unavailable"))
+                .expect(expected_attempts)
+                .mount(&mock_server)
+                .await;
+
+            let client = create_test_client(max_retries, 30000);
+            let response = client
+                .execute_with_retry(|| client.inner().get(format!("{}/test", mock_server.uri())))
+                .await;
+
+            assert!(
+                matches!(
+                    response,
+                    Err(OdosError::Api {
+                        status: StatusCode::SERVICE_UNAVAILABLE,
+                        ..
+                    })
+                ),
+                "max_retries={max_retries} should exhaust after {expected_attempts} total attempts, got {response:?}"
             );
         }
     }

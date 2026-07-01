@@ -208,7 +208,7 @@ let client = OdosClient::with_retry_config(RetryConfig::conservative())?;
 
 // Replace the default policy with custom logic
 let client = OdosClient::with_retry_config(RetryConfig {
-    max_retries: 5,
+    max_retries: 5, // up to 5 total attempts
     initial_backoff_ms: 200,
     retry_server_errors: true,
     retry_predicate: RetryPredicate::Replace(|err| err.is_retryable()),

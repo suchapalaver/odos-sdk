@@ -97,7 +97,7 @@ impl OdosClient {
     /// - Public API endpoint
     /// - API version V2
     /// - 30 second timeout
-    /// - 3 retry attempts with exponential backoff
+    /// - Up to 3 total attempts for retryable errors, with exponential backoff
     ///
     /// Construct one client per process and `clone()` it into worker tasks —
     /// see the [type-level docs](OdosClient#reuse) for why.

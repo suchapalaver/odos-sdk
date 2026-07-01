@@ -392,7 +392,7 @@ use std::str::FromStr;
 async fn main() -> Result<()> {
     // Initialize client with custom config
     let client = OdosClient::with_retry_config(RetryConfig {
-        max_retries: 3,
+        max_retries: 3, // up to 3 total attempts
         initial_backoff_ms: 100,
         retry_server_errors: true,
         retry_predicate: RetryPredicate::Default,

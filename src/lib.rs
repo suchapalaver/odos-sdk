@@ -108,7 +108,7 @@
 //!     timeout: Duration::from_secs(30),
 //!     connect_timeout: Duration::from_secs(10),
 //!     retry_config: RetryConfig {
-//!         max_retries: 3,
+//!         max_retries: 3, // up to 3 total attempts
 //!         initial_backoff_ms: 100,
 //!         retry_server_errors: true,
 //!         retry_predicate: RetryPredicate::Default,
@@ -279,7 +279,7 @@
 //!
 //! // Custom configuration
 //! let retry_config = RetryConfig {
-//!     max_retries: 5,
+//!     max_retries: 5, // up to 5 total attempts
 //!     initial_backoff_ms: 200,
 //!     retry_server_errors: false,  // Don't retry 5xx errors
 //!     retry_predicate: RetryPredicate::Default,

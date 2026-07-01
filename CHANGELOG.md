@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update the direct Alloy 2.x dependency line from `2.0` to `2.1`,
   keeping `alloy-primitives` and `alloy-sol-types` on the current Alloy Core
   `1.6` line.
+- Clarify that `RetryConfig::max_retries` is a total attempt budget and add
+  coverage for retryable API error attempt counts. Closes
+  [#4](https://github.com/suchapalaver/odos-sdk/issues/4).
 
 ## [11.0.2] - 2026-05-27
 
